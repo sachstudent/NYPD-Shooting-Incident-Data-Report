@@ -1,0 +1,84 @@
+---
+title: "NYPD"
+output:
+  pdf_document: default
+  html_document: default
+date: "2024-04-30"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+
+library(tidyverse)
+library(lubridate)
+```
+
+```{r load-data}
+url_in <- "https://data.cityofnewyork.us/api/views/833y-fsy8/rows.csv?accessType=DOWNLOAD"
+
+shooting_data <- read_csv(url_in)
+```
+
+```{r clean-data}
+## Cleaning Data
+shooting_data <- shooting_data %>%
+  rename_all(tolower) %>%
+  rename(date_of_incident = occur_date, time_of_incident = occur_time) %>%
+  mutate(date_of_incident = mdy(date_of_incident),
+         time_of_incident = hms(time_of_incident),
+         latitude = as.numeric(latitude),
+         longitude = as.numeric(longitude)) %>%
+  filter(!is.na(date_of_incident))
+glimpse(shooting_data)
+```
+
+```{r data-analysis}
+## Data Analysis
+summary_stats <- shooting_data %>%
+  group_by(boro) %>%
+  summarise(total_incidents = n(),
+            murders = sum(statistical_murder_flag, na.rm = TRUE))
+
+summary_stats
+
+shooting_data_summary <- shooting_data %>%
+  group_by(date_of_incident) %>%
+  summarise(total_incidents = n(), .groups = 'drop')
+  
+shooting_data_summary
+```
+
+```{r time-series-plot}
+## Time series of incidents
+shooting_data %>%
+  ggplot(aes(x = date_of_incident)) +
+  geom_histogram(binwidth = 30, fill = "blue", color = "white") +
+  labs(title = "Monthly Shooting Incidents", x = "Date", y = "Number of Incidents")
+```
+
+```{r incidents-by-boro-plot}
+## Incidents by borough
+shooting_data %>%
+  ggplot(aes(x = factor(boro))) +
+  geom_bar(fill = "cyan", color = "black") +
+  labs(title = "Shooting Incidents by Borough", x = "Borough", y = "Count")
+```
+
+```{r modeling}
+## Linear model predicting incidents based on time
+model <- lm(total_incidents ~ month(date_of_incident) + year(date_of_incident), data = shooting_data_summary)
+summary(model)
+```
+
+```{r bias}
+## Bias Discussion
+
+# - Reporting Bias: Differences in reporting due to location, time, and victim/witness reluctance.
+# - Selection Bias: Over / under representation of certain incident types.
+# - Geographical Bias: Variance in reporting intensity across different areas.
+# - Outcome Bias: More complete data for cases with severe outcomes.
+# - Perpetrator and Victim Bias: Categorization biases based on race, age, or gender.
+# - Data Entry and Classification Bias: Errors in documentation affecting data accuracy.
+
+```
